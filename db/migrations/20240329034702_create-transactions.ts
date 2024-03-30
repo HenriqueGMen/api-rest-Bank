@@ -1,7 +1,7 @@
 import type { Knex } from 'knex'
 
 export async function up(knex: Knex): Promise<void> {
-  return knex.schema.createTable('transactions', (table) => {
+  await knex.schema.createTable('transactions', (table) => {
     table.uuid('id').primary()
     table.text('tittle').notNullable()
     table.decimal('amount', 10, 2).notNullable()
