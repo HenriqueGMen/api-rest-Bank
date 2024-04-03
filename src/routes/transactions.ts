@@ -4,6 +4,24 @@ import { z } from 'zod'
 import { randomUUID } from 'crypto'
 
 export async function transactionsRoutes(server: FastifyInstance) {
+  server.get('/', async () => {
+    const transactions = await knex('transactions').select('*')
+
+    return { transactions }
+  })
+
+  server.get('/:id', async (request) => {
+    const getTransactionsSchema = z.object({
+      id: z.string().uuid(),
+    })
+
+    const { id } = getTransactionsSchema.parse(request.params)
+
+    const transactions = await knex('transactions').where('id', id).first()
+
+    return transactions
+  })
+
   server.post('/', async (request, reply) => {
     const createTransactionSchema = z.object({
       tittle: z.string(),
@@ -19,6 +37,6 @@ export async function transactionsRoutes(server: FastifyInstance) {
       amount: type === 'credit' ? amount : amount * -1,
     })
 
-    return reply.status(201).send
+    return reply.status(201).send()
   })
 }
