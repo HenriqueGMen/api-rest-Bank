@@ -1,34 +1,57 @@
+import { checkSessionIdExists } from '../middlewares/check-sessionId-exists'
 import { FastifyInstance } from 'fastify'
+import { randomUUID } from 'crypto'
 import { knex } from '../database'
 import { z } from 'zod'
-import { randomUUID } from 'crypto'
 
 export async function transactionsRoutes(server: FastifyInstance) {
-  server.get('/', async () => {
-    const transactions = await knex('transactions').select('*')
+  server.get('/', { preHandler: [checkSessionIdExists] }, async (request) => {
+    const { sessionId } = request.cookies
+
+    const transactions = await knex('transactions')
+      .where('session_id', sessionId)
+      .select()
 
     return { transactions }
   })
 
-  server.get('/:id', async (request) => {
-    const getTransactionsSchema = z.object({
-      id: z.string().uuid(),
-    })
+  server.get(
+    '/:id',
+    { preHandler: [checkSessionIdExists] },
+    async (request) => {
+      const getTransactionsSchema = z.object({
+        id: z.string().uuid(),
+      })
 
-    const { id } = getTransactionsSchema.parse(request.params)
+      const { id } = getTransactionsSchema.parse(request.params)
 
-    const transactions = await knex('transactions').where('id', id).first()
+      const { sessionId } = request.cookies
 
-    return transactions
-  })
+      const transactions = await knex('transactions')
+        .where({
+          session_id: sessionId,
+          id,
+        })
+        .first()
 
-  server.get('/summary', async () => {
-    const summary = await knex('transactions')
-      .sum('amount', { as: 'amount' })
-      .first()
+      return transactions
+    },
+  )
 
-    return { summary }
-  })
+  server.get(
+    '/summary',
+    { preHandler: [checkSessionIdExists] },
+    async (request) => {
+      const { sessionId } = request.cookies
+
+      const summary = await knex('transactions')
+        .where('session_id', sessionId)
+        .sum('amount', { as: 'amount' })
+        .first()
+
+      return { summary }
+    },
+  )
 
   server.post('/', async (request, reply) => {
     const createTransactionSchema = z.object({
@@ -39,7 +62,7 @@ export async function transactionsRoutes(server: FastifyInstance) {
 
     const { tittle, amount, type } = createTransactionSchema.parse(request.body)
 
-    let sessionId = request.cookies.sessionId
+    let { sessionId } = request.cookies
 
     if (!sessionId) {
       sessionId = randomUUID()
