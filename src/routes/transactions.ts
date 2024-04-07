@@ -1,11 +1,11 @@
-import { checkSessionIdExists } from '../middlewares/check-sessionId-exists'
+import { checkSessionIdExists } from '../middlewares/check-sessionid-exists'
 import { FastifyInstance } from 'fastify'
 import { randomUUID } from 'crypto'
 import { knex } from '../database'
 import { z } from 'zod'
 
-export async function transactionsRoutes(server: FastifyInstance) {
-  server.get('/', { preHandler: [checkSessionIdExists] }, async (request) => {
+export async function transactionsRoutes(app: FastifyInstance) {
+  app.get('/', { preHandler: [checkSessionIdExists] }, async (request) => {
     const { sessionId } = request.cookies
 
     const transactions = await knex('transactions')
@@ -15,30 +15,26 @@ export async function transactionsRoutes(server: FastifyInstance) {
     return { transactions }
   })
 
-  server.get(
-    '/:id',
-    { preHandler: [checkSessionIdExists] },
-    async (request) => {
-      const getTransactionsSchema = z.object({
-        id: z.string().uuid(),
+  app.get('/:id', { preHandler: [checkSessionIdExists] }, async (request) => {
+    const getTransactionsSchema = z.object({
+      id: z.string().uuid(),
+    })
+
+    const { id } = getTransactionsSchema.parse(request.params)
+
+    const { sessionId } = request.cookies
+
+    const transactions = await knex('transactions')
+      .where({
+        session_id: sessionId,
+        id,
       })
+      .first()
 
-      const { id } = getTransactionsSchema.parse(request.params)
+    return transactions
+  })
 
-      const { sessionId } = request.cookies
-
-      const transactions = await knex('transactions')
-        .where({
-          session_id: sessionId,
-          id,
-        })
-        .first()
-
-      return transactions
-    },
-  )
-
-  server.get(
+  app.get(
     '/summary',
     { preHandler: [checkSessionIdExists] },
     async (request) => {
@@ -53,7 +49,7 @@ export async function transactionsRoutes(server: FastifyInstance) {
     },
   )
 
-  server.post('/', async (request, reply) => {
+  app.post('/', async (request, reply) => {
     const createTransactionSchema = z.object({
       tittle: z.string(),
       amount: z.number(),
